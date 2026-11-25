@@ -25,11 +25,229 @@ public class JoaoVitor_Cad_vendas extends javax.swing.JInternalFrame {
     public double recebe_valor_unitario;
     public double recebe_valor_total;
     public String recebe_condicoes;
+    
+    // Tabelas auxiliares exibidas quando os campos de ID recebem foco.
+    private javax.swing.JTable tabelaClientes;
+    private javax.swing.JTable tabelaProdutos;
 
     public JoaoVitor_Cad_vendas() {
         initComponents();
+
+        inicializarTabelasAuxiliares();
+        configurarEventosFoco();
+
         mostrarDataAtual();
         configurarColunasTabela();
+
+        // Ao abrir a tela, a tabela de vendas é a tabela padrão.
+        exibirTabelaVendas();
+    }
+
+    private void inicializarTabelasAuxiliares() {
+
+        // TABELA DE CLIENTES
+        tabelaClientes = new javax.swing.JTable(
+            new DefaultTableModel(
+                new Object[][]{},
+                new String[]{
+                    "Código", "Nome", "E-mail",
+                    "Telefone", "CPF", "Cartão"
+                }
+            ) {
+                @Override
+                public boolean isCellEditable(int linha, int coluna) {
+                    return false;
+                }
+            }
+        );
+
+        tabelaClientes.setFocusable(false);
+        tabelaClientes.setFillsViewportHeight(true);
+
+        // TABELA DE PRODUTOS
+        tabelaProdutos = new javax.swing.JTable(
+            new DefaultTableModel(
+                new Object[][]{},
+                new String[]{
+                    "Código", "Descrição", "Marca",
+                    "Preço", "Unidade", "Validade"
+                }
+            ) {
+                @Override
+                public boolean isCellEditable(int linha, int coluna) {
+                    return false;
+                }
+            }
+        );
+
+        tabelaProdutos.setFocusable(false);
+        tabelaProdutos.setFillsViewportHeight(true);
+    }
+
+    private void configurarEventosFoco() {
+
+        // Ao entrar no campo ID Cliente, mostra a tabela de clientes.
+        txt_jv_id_cliente.addFocusListener(
+            new java.awt.event.FocusAdapter() {
+                @Override
+                public void focusGained(java.awt.event.FocusEvent evt) {
+                    exibirTabelaClientes();
+                }
+
+                @Override
+                public void focusLost(java.awt.event.FocusEvent evt) {
+                    atualizarTabelaConformeFoco();
+                }
+            }
+        );
+
+        // Ao entrar no campo ID Produto, mostra a tabela de produtos.
+        txt_jv_id_produto.addFocusListener(
+            new java.awt.event.FocusAdapter() {
+                @Override
+                public void focusGained(java.awt.event.FocusEvent evt) {
+                    exibirTabelaProdutos();
+                }
+
+                @Override
+                public void focusLost(java.awt.event.FocusEvent evt) {
+                    atualizarTabelaConformeFoco();
+                }
+            }
+        );
+    }
+
+    /*
+     * Aguarda o Swing terminar a troca de foco para decidir qual tabela
+     * deve ficar visível. Isso evita mostrar vendas por um instante
+     * quando o usuário troca diretamente de ID Cliente para ID Produto.
+     */
+    private void atualizarTabelaConformeFoco() {
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            java.awt.Component componenteFocado =
+                java.awt.KeyboardFocusManager
+                    .getCurrentKeyboardFocusManager()
+                    .getFocusOwner();
+
+            if (componenteFocado == txt_jv_id_cliente) {
+                exibirTabelaClientes();
+            } else if (componenteFocado == txt_jv_id_produto) {
+                exibirTabelaProdutos();
+            } else {
+                exibirTabelaVendas();
+            }
+        });
+    }
+
+    private void CarregaGridClientes() throws SQLException {
+
+        DefaultTableModel modelo =
+            (DefaultTableModel) tabelaClientes.getModel();
+
+        modelo.setRowCount(0);
+
+        Banco bd = new Banco();
+
+        try (Connection conn = bd.obtemConexao()) {
+            if (conn == null) {
+                return;
+            }
+
+            String sql = "SELECT idcliente, nome, email, telefone, cpf, cartao "
+                       + "FROM clientes ORDER BY idcliente";
+
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+
+                while (rs.next()) {
+                    modelo.addRow(new Object[]{
+                        rs.getString("idcliente"),
+                        rs.getString("nome"),
+                        rs.getString("email"),
+                        rs.getString("telefone"),
+                        rs.getString("cpf"),
+                        rs.getString("cartao")
+                    });
+                }
+            }
+        }
+    }
+
+    private void CarregaGridProdutos() throws SQLException {
+
+        DefaultTableModel modelo =
+            (DefaultTableModel) tabelaProdutos.getModel();
+
+        modelo.setRowCount(0);
+
+        Banco bd = new Banco();
+        DecimalFormat df = new DecimalFormat("0.00");
+
+        try (Connection conn = bd.obtemConexao()) {
+            if (conn == null) {
+                return;
+            }
+
+            String sql = "SELECT idproduto, descricao, marca, preco, unidade, data_validade "
+                       + "FROM produtos ORDER BY idproduto";
+
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+
+                while (rs.next()) {
+                    modelo.addRow(new Object[]{
+                        rs.getString("idproduto"),
+                        rs.getString("descricao"),
+                        rs.getString("marca"),
+                        df.format(rs.getDouble("preco")),
+                        rs.getString("unidade"),
+                        rs.getString("data_validade")
+                    });
+                }
+            }
+        }
+    }
+
+    private void exibirTabelaClientes() {
+        jScrollPane1.setViewportView(tabelaClientes);
+
+        try {
+            CarregaGridClientes();
+        } catch (SQLException ex) {
+            Logger.getLogger(JoaoVitor_Cad_vendas.class.getName())
+                .log(Level.SEVERE, null, ex);
+        }
+
+        jScrollPane1.revalidate();
+        jScrollPane1.repaint();
+    }
+
+    private void exibirTabelaProdutos() {
+        jScrollPane1.setViewportView(tabelaProdutos);
+
+        try {
+            CarregaGridProdutos();
+        } catch (SQLException ex) {
+            Logger.getLogger(JoaoVitor_Cad_vendas.class.getName())
+                .log(Level.SEVERE, null, ex);
+        }
+
+        jScrollPane1.revalidate();
+        jScrollPane1.repaint();
+    }
+
+    private void exibirTabelaVendas() {
+        jScrollPane1.setViewportView(jTable1);
+
+        try {
+            CarregaGrid();
+        } catch (SQLException ex) {
+            Logger.getLogger(JoaoVitor_Cad_vendas.class.getName())
+                .log(Level.SEVERE, null, ex);
+        }
+
+        jScrollPane1.revalidate();
+        jScrollPane1.repaint();
     }
 
     private void mostrarDataAtual() {
